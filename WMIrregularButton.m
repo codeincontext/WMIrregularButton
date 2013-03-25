@@ -7,6 +7,13 @@
 
 #import "WMIrregularButton.h"
 
+@interface WMIrregularButton () {
+    UIImage *_image;
+    NSData *_imageData;
+}
+
+@end
+
 @implementation WMIrregularButton
 
 - (id)initWithFrame:(CGRect)frame {
@@ -33,9 +40,6 @@
     [self setImageMask];
 }
 
-UIImage *image;
-NSData *imageData;
-
 // Return the offset for the alpha pixel at (x,y) for RGBA
 // 4-bytes-per-pixel bitmap data
 static NSUInteger alphaOffset(NSUInteger x, NSUInteger y, NSUInteger w) {return y * w * 4 + x * 4;}
@@ -43,22 +47,29 @@ static NSUInteger alphaOffset(NSUInteger x, NSUInteger y, NSUInteger w) {return 
 // Override hit detection. Does the point hit the mask?
 - (BOOL) pointInside:(CGPoint)point withEvent:(UIEvent *)event {
     if (!CGRectContainsPoint(self.bounds, point)) return NO;
-    Byte *bytes = (Byte *)imageData.bytes;
-    uint offset = alphaOffset(point.x, point.y, image.size.width);
-    return (bytes[offset] > 0);
+    Byte *bytes = (Byte *)_imageData.bytes;
+    uint offset = alphaOffset(point.x, point.y, _image.size.width);
+    return bytes[offset] > 0;
 }
 
 - (void) setImageMask {
-    image = [self imageForState:UIControlStateNormal];
-    if (image == nil) return;
+    _image = [self imageForState:UIControlStateNormal];
+    if (_image == nil) return;
+    
+    float widthDiff = _image.size.width - self.frame.size.width;
+    float heightDiff = _image.size.height - self.frame.size.height;
+    if (widthDiff > 0.01 || widthDiff < -0.01 || heightDiff > 0.01 || heightDiff < -0.01) {
+        NSLog(@"WMIrregularButton: frame doesn't match image size. f:%.0f:%.0f i:%.0f:%.0f", self.frame.size.width, self.frame.size.height, _image.size.width, _image.size.height);
+    }
 
+    
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     if (colorSpace == NULL) {
         fprintf(stderr, "Error allocating color space\n");
         return;
     }
     
-    CGSize size = image.size;
+    CGSize size = _image.size;
     unsigned char *bitmapData = calloc(size.width * size.height * 4, 1);
     if (bitmapData == NULL) { 
         NSLog(@"Error: Memory not allocated!");
@@ -77,11 +88,11 @@ static NSUInteger alphaOffset(NSUInteger x, NSUInteger y, NSUInteger w) {return 
     }
     
     CGRect rect = CGRectMake(0.0f, 0.0f, size.width, size.height);
-    CGContextDrawImage(context, rect, image.CGImage);
+    CGContextDrawImage(context, rect, _image.CGImage);
     unsigned char *data = CGBitmapContextGetData(context);
     CGContextRelease(context);
     
-    imageData = [NSData dataWithBytes:data length:size.width * size.height * 4];
+    _imageData = [NSData dataWithBytes:data length:size.width * size.height * 4];
     free(bitmapData);
 }
 
